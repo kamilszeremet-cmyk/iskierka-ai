@@ -17,9 +17,3 @@ services:
         sync: false
       - key: TTS_PROVIDER
         value: off
-      - key: AZURE_SPEECH_KEY
-        sync: false
-      - key: AZURE_SPEECH_REGION
-        sync: false
-      - key: AZURE_SPEECH_VOICE
-        value: pl-PL-ZofiaNeural
