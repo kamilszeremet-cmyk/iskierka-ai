@@ -2219,6 +2219,19 @@ body.friend-test .chat-panel {
     padding-top: 12px;
   }
 
+  .parent-panel.is-locked {
+    min-height: auto;
+    padding-bottom: 14px;
+  }
+
+  .parent-panel.is-locked .panel-art,
+  .parent-panel.is-locked .parent-title,
+  .parent-panel.is-locked .parent-settings,
+  .parent-panel.is-locked .config-box,
+  .parent-panel.is-locked .memory-panel {
+    display: none;
+  }
+
   .panel-art,
   .parent-title,
   .parent-settings,
@@ -2232,8 +2245,12 @@ body.friend-test .chat-panel {
   }
 
   .parent-lock {
+    position: relative;
+    inset: auto;
+    grid-column: 1;
     align-items: start;
-    padding-top: 14px;
+    min-height: auto;
+    padding: 14px 16px 16px;
   }
 
   .parent-lock-box {
