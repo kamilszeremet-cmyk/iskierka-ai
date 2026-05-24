@@ -7,6 +7,7 @@ const modelEl = document.querySelector("#modelName");
 const clearButton = document.querySelector("#clearChat");
 const installAppButton = document.querySelector("#installApp");
 const shareTestButton = document.querySelector("#shareTest");
+const parentJumpButton = document.querySelector("#parentJump");
 const mascotEl = document.querySelector(".mascot");
 const ageButtons = [...document.querySelectorAll(".age-button")];
 const onboarding = document.querySelector("#onboarding");
@@ -322,6 +323,10 @@ resetPinButton?.addEventListener("click", () => {
 lockParentButton?.addEventListener("click", () => {
   parentUnlocked = false;
   updateParentLockState("Panel został zablokowany.");
+});
+
+parentJumpButton?.addEventListener("click", () => {
+  parentPanel?.scrollIntoView({ behavior: "auto", block: "start" });
 });
 
 shufflePromptsButton.addEventListener("click", () => {

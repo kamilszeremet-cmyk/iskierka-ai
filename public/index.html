@@ -8,7 +8,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icon.svg" />
-    <link rel="stylesheet" href="/style.css?v=26" />
+    <link rel="stylesheet" href="/style.css?v=29" />
   </head>
   <body>
     <div class="storybook-bg" aria-hidden="true">
@@ -39,6 +39,7 @@
           <div class="top-actions">
             <button id="installApp" class="install-button" type="button" hidden>Instaluj</button>
             <button id="shareTest" class="install-button share-button" type="button">Test</button>
+            <button id="parentJump" class="install-button parent-jump-button" type="button">PIN</button>
             <div class="age-switch" aria-label="Wiek dziecka">
               <button class="age-button active" data-age="6-8" type="button">6-8</button>
               <button class="age-button" data-age="9-12" type="button">9-12</button>
@@ -145,6 +146,12 @@
           <span id="voiceStatus">Tryb głosowy gotowy</span>
         </div>
 
+        <form id="chatForm" class="composer">
+          <label class="sr-only" for="userInput">Wiadomość</label>
+          <textarea id="userInput" rows="2" maxlength="1200" placeholder="Napisz albo nagraj pytanie..." autocomplete="off"></textarea>
+          <button id="sendButton" type="submit">Wyślij</button>
+        </form>
+
         <div class="suggestion-bar">
           <div>
             <span>Bajkowa półka pytań</span>
@@ -162,12 +169,6 @@
         </div>
 
         <div id="promptRow" class="prompt-row" aria-label="Szybkie tematy"></div>
-
-        <form id="chatForm" class="composer">
-          <label class="sr-only" for="userInput">Wiadomość</label>
-          <textarea id="userInput" rows="2" maxlength="1200" placeholder="Napisz albo nagraj pytanie..." autocomplete="off"></textarea>
-          <button id="sendButton" type="submit">Wyślij</button>
-        </form>
       </section>
 
       <aside class="parent-panel" aria-label="Panel opiekuna">
@@ -280,6 +281,6 @@
       </aside>
     </main>
 
-    <script src="/app.js?v=26" type="module"></script>
+    <script src="/app.js?v=29" type="module"></script>
   </body>
 </html>

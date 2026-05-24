@@ -1,8 +1,8 @@
-const CACHE_NAME = "iskierka-v26";
+const CACHE_NAME = "iskierka-v29";
 const APP_SHELL = [
   "/",
-  "/style.css?v=26",
-  "/app.js?v=26",
+  "/style.css?v=29",
+  "/app.js?v=29",
   "/manifest.webmanifest",
   "/assets/fairy-scene.svg",
   "/assets/icon.svg"
