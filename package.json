@@ -1,0 +1,16 @@
+{
+  "name": "ai-dla-dzieci",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Prosty czat AI dla dzieci z proxy do darmowych endpointow NVIDIA NIM.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "call \"%npm_node_execpath%\" scripts\\check.mjs",
+    "deploy:check": "call \"%npm_node_execpath%\" scripts\\deploy-check.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

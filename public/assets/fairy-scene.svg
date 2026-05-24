@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" role="img" aria-label="Bajkowy krajobraz z zamkiem, wzgorzami i swietlikami">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#171b45"/>
+      <stop offset="0.54" stop-color="#2b245f"/>
+      <stop offset="1" stop-color="#4a355d"/>
+    </linearGradient>
+    <linearGradient id="hillA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7f986f"/>
+      <stop offset="1" stop-color="#547f65"/>
+    </linearGradient>
+    <linearGradient id="hillB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a6b982"/>
+      <stop offset="1" stop-color="#789a6a"/>
+    </linearGradient>
+    <linearGradient id="castle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9180d9"/>
+      <stop offset="1" stop-color="#4b3b9a"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#382f58" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="420" fill="url(#sky)"/>
+
+  <circle cx="1000" cy="78" r="42" fill="#e6ca72" opacity="0.95"/>
+  <circle cx="156" cy="92" r="34" fill="#dfe8ff" opacity="0.34"/>
+  <circle cx="198" cy="86" r="27" fill="#dfe8ff" opacity="0.32"/>
+  <circle cx="235" cy="98" r="35" fill="#dfe8ff" opacity="0.28"/>
+  <rect x="152" y="92" width="128" height="32" rx="16" fill="#dfe8ff" opacity="0.3"/>
+
+  <circle cx="760" cy="88" r="18" fill="#dfe8ff" opacity="0.26"/>
+  <circle cx="792" cy="84" r="25" fill="#dfe8ff" opacity="0.26"/>
+  <circle cx="824" cy="98" r="18" fill="#dfe8ff" opacity="0.24"/>
+  <rect x="758" y="92" width="86" height="20" rx="10" fill="#dfe8ff" opacity="0.24"/>
+
+  <path d="M-40 342 C150 255 310 270 480 324 C650 380 820 302 960 286 C1080 272 1184 314 1240 348 L1240 430 L-40 430 Z" fill="url(#hillB)"/>
+  <path d="M-50 382 C160 296 330 316 520 360 C740 410 920 314 1240 356 L1240 430 L-50 430 Z" fill="url(#hillA)"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M704 234 h56 v-82 h52 v82 h58 v-118 h58 v118 h54 v-74 h52 v74 h54 v120 H704 Z" fill="url(#castle)"/>
+    <path d="M708 152 l26 -46 l26 46 Z" fill="#d85f89"/>
+    <path d="M806 116 l32 -54 l32 54 Z" fill="#d7a84d"/>
+    <path d="M922 118 l34 -60 l34 60 Z" fill="#a95588"/>
+    <rect x="730" y="190" width="18" height="32" rx="9" fill="#ead28b"/>
+    <rect x="834" y="178" width="18" height="44" rx="9" fill="#ead28b"/>
+    <rect x="950" y="188" width="18" height="34" rx="9" fill="#ead28b"/>
+    <path d="M871 354 v-56 c0 -26 21 -47 47 -47 c26 0 47 21 47 47 v56 Z" fill="#362763" opacity="0.86"/>
+  </g>
+
+  <path d="M1034 196 C1082 148 1138 134 1210 152" fill="none" stroke="#d8d2ff" stroke-width="6" stroke-linecap="round" stroke-dasharray="10 18" opacity="0.76"/>
+  <path d="M585 168 C634 132 686 122 742 137" fill="none" stroke="#d8d2ff" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 16" opacity="0.54"/>
+
+  <g opacity="0.95">
+    <path d="M548 133 l10 22 l24 3 l-18 16 l5 24 l-21 -12 l-21 12 l5 -24 l-18 -16 l24 -3 Z" fill="#d7a84d"/>
+    <path d="M103 142 l8 16 l18 2 l-13 12 l4 18 l-17 -9 l-16 9 l3 -18 l-13 -12 l18 -2 Z" fill="#e0b96b"/>
+    <path d="M1116 237 l7 14 l16 2 l-12 10 l3 16 l-14 -8 l-14 8 l3 -16 l-12 -10 l16 -2 Z" fill="#e9e1ff"/>
+  </g>
+
+  <g opacity="0.8">
+    <circle cx="642" cy="250" r="5" fill="#f4df8d"/>
+    <circle cx="596" cy="288" r="4" fill="#f4df8d"/>
+    <circle cx="1082" cy="278" r="5" fill="#f4df8d"/>
+    <circle cx="1116" cy="314" r="4" fill="#f4df8d"/>
+    <circle cx="424" cy="312" r="4" fill="#f4df8d"/>
+  </g>
+</svg>

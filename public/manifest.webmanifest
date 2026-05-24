@@ -1,0 +1,20 @@
+{
+  "name": "Iskierka AI dla dzieci",
+  "short_name": "Iskierka",
+  "description": "Bajkowy czat AI dla dzieci z panelem opiekuna.",
+  "lang": "pl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0a24",
+  "theme_color": "#17104a",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

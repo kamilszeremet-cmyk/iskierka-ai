@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iskierka AI dla dzieci</title>
+    <meta name="theme-color" content="#17104a" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/icon.svg" />
+    <link rel="stylesheet" href="/style.css?v=26" />
+  </head>
+  <body>
+    <div class="storybook-bg" aria-hidden="true">
+      <span class="star s1"></span>
+      <span class="star s2"></span>
+      <span class="star s3"></span>
+      <span class="star s4"></span>
+      <span class="leaf l1"></span>
+      <span class="leaf l2"></span>
+    </div>
+
+    <main class="app-shell">
+      <section class="chat-panel" aria-label="Czat AI dla dzieci">
+        <header class="topbar">
+          <div class="brand">
+            <div class="mascot" aria-hidden="true">
+              <span></span>
+              <i class="spark spark-one"></i>
+              <i class="spark spark-two"></i>
+              <i class="spark spark-three"></i>
+            </div>
+            <div>
+              <h1>Iskierka</h1>
+              <p>AI, które tłumaczy jak bajkowy przewodnik</p>
+            </div>
+          </div>
+
+          <div class="top-actions">
+            <button id="installApp" class="install-button" type="button" hidden>Instaluj</button>
+            <button id="shareTest" class="install-button share-button" type="button">Test</button>
+            <div class="age-switch" aria-label="Wiek dziecka">
+              <button class="age-button active" data-age="6-8" type="button">6-8</button>
+              <button class="age-button" data-age="9-12" type="button">9-12</button>
+              <button class="age-button" data-age="13+" type="button">13+</button>
+            </div>
+          </div>
+        </header>
+
+        <section id="onboarding" class="onboarding" aria-label="Pierwsze ustawienia dziecka">
+          <div class="onboarding-copy">
+            <span>Pierwsze uruchomienie</span>
+            <h2>Jak Iskierka ma z Tobą rozmawiać?</h2>
+          </div>
+          <div class="onboarding-fields">
+            <label class="setting-field">
+              <span>Nick</span>
+              <input id="onboardingName" type="text" maxlength="24" placeholder="np. Ola" autocomplete="off" />
+            </label>
+            <label class="setting-field">
+              <span>Ulubiony klimat</span>
+              <select id="onboardingTheme">
+                <option value="">Wybierz</option>
+                <option value="bajki">Bajki</option>
+                <option value="kosmos">Kosmos</option>
+                <option value="roboty">Roboty</option>
+                <option value="przyroda">Przyroda</option>
+                <option value="emocje">Emocje</option>
+                <option value="zagadki">Zagadki</option>
+                <option value="sztuka">Sztuka</option>
+                <option value="dinozaury">Dinozaury</option>
+              </select>
+            </label>
+          </div>
+          <button id="finishOnboarding" class="parent-action" type="button">Zaczynamy</button>
+        </section>
+
+        <div class="status-strip">
+          <span id="providerStatus">Sprawdzam API...</span>
+          <button id="clearChat" class="ghost-button" type="button">Wyczyść</button>
+        </div>
+
+        <section id="startBoard" class="start-board" aria-label="Start dla dziecka">
+          <div class="start-copy">
+            <span id="startEyebrow">Wybierz obrazek albo zadaj pytanie</span>
+            <h2 id="startTitle">Co dziś odkrywamy?</h2>
+          </div>
+          <div class="start-cards">
+            <button class="start-card" type="button" data-start-prompt="Opowiedz mi krótką bajkę na dziś.">
+              <span class="prompt-picture icon-castle" aria-hidden="true"></span>
+              <strong>Bajka</strong>
+            </button>
+            <button class="start-card" type="button" data-start-prompt="Wytłumacz mi coś ciekawego o kosmosie bardzo prosto.">
+              <span class="prompt-picture icon-moon" aria-hidden="true"></span>
+              <strong>Kosmos</strong>
+            </button>
+            <button class="start-card" type="button" data-start-prompt="Pomóż mi nazwać emocję i uspokoić się po dziecięcemu.">
+              <span class="prompt-picture icon-heart" aria-hidden="true"></span>
+              <strong>Emocje</strong>
+            </button>
+            <button class="start-card" type="button" data-start-prompt="Opowiedz scenkę o robocie, który uczy się świata.">
+              <span class="prompt-picture icon-robot" aria-hidden="true"></span>
+              <strong>Robot</strong>
+            </button>
+            <button class="start-card" type="button" data-start-prompt="Daj mi spokojną mini-opowieść przed snem.">
+              <span class="prompt-picture icon-cloud" aria-hidden="true"></span>
+              <strong>Sen</strong>
+            </button>
+            <button class="start-card" type="button" data-start-prompt="Zadaj mi prostą zagadkę z trzema podpowiedziami.">
+              <span class="prompt-picture icon-question" aria-hidden="true"></span>
+              <strong>Zagadka</strong>
+            </button>
+          </div>
+        </section>
+
+        <div id="messages" class="messages" aria-live="polite">
+          <article class="message assistant">
+            <div class="avatar">I</div>
+            <div class="message-content">
+              <div class="bubble">Cześć. Jestem Iskierka. Mogę tłumaczyć świat prosto, wymyślać opowieści i pomagać w nauce bez straszenia.</div>
+            </div>
+          </article>
+        </div>
+
+        <div class="voice-row" aria-label="Tryb głosowy">
+          <button id="voiceButton" class="voice-button" type="button" aria-pressed="false" title="Powiedz pytanie">
+            <span class="mic-icon" aria-hidden="true"></span>
+            <span>Nagraj</span>
+          </button>
+          <button id="readLastButton" class="voice-button secondary" type="button" title="Odtwórz ostatnią odpowiedź">
+            <span class="speaker-icon" aria-hidden="true"></span>
+            <span>Słuchaj</span>
+          </button>
+          <label class="voice-toggle">
+            <input id="autoReadToggle" type="checkbox" checked />
+            <span>Auto czytanie</span>
+          </label>
+          <div class="voice-style" aria-label="Styl głosu">
+            <button class="active" data-voice-style="story" type="button">Bajkowy</button>
+            <button data-voice-style="whisper" type="button">Szept</button>
+            <button data-voice-style="bright" type="button">Wesoły</button>
+            <button data-voice-style="explorer" type="button">Odkrywca</button>
+            <button data-voice-style="robot" type="button">Robot</button>
+          </div>
+          <span id="voiceStatus">Tryb głosowy gotowy</span>
+        </div>
+
+        <div class="suggestion-bar">
+          <div>
+            <span>Bajkowa półka pytań</span>
+            <strong>Wybierz pomysł albo wylosuj nowy zestaw</strong>
+          </div>
+          <div class="prompt-set-switch" aria-label="Zestaw pytań">
+            <button class="active" data-prompt-set="mix" type="button">Miks</button>
+            <button data-prompt-set="little" type="button">Maluch</button>
+            <button data-prompt-set="sleep" type="button">Sen</button>
+            <button data-prompt-set="feelings" type="button">Emocje</button>
+            <button data-prompt-set="discover" type="button">Odkryj</button>
+            <button data-prompt-set="create" type="button">Twórz</button>
+          </div>
+          <button id="shufflePrompts" class="shuffle-button" type="button">Losuj</button>
+        </div>
+
+        <div id="promptRow" class="prompt-row" aria-label="Szybkie tematy"></div>
+
+        <form id="chatForm" class="composer">
+          <label class="sr-only" for="userInput">Wiadomość</label>
+          <textarea id="userInput" rows="2" maxlength="1200" placeholder="Napisz albo nagraj pytanie..." autocomplete="off"></textarea>
+          <button id="sendButton" type="submit">Wyślij</button>
+        </form>
+      </section>
+
+      <aside class="parent-panel" aria-label="Panel opiekuna">
+        <div class="panel-art fairy-scene" aria-hidden="true">
+          <div class="moon"></div>
+          <div class="castle">
+            <span class="tower left"></span>
+            <span class="keep"></span>
+            <span class="tower right"></span>
+          </div>
+          <div class="hill back"></div>
+          <div class="hill front"></div>
+          <div class="window-light w1"></div>
+          <div class="window-light w2"></div>
+          <div class="magic-trail"></div>
+        </div>
+
+        <div class="parent-title">
+          <h2>Dla opiekuna</h2>
+          <button id="lockParent" class="parent-lock-button" type="button">Zablokuj</button>
+        </div>
+        <div class="parent-settings">
+          <label class="setting-field">
+            <span>Nick</span>
+            <input id="childName" type="text" maxlength="24" placeholder="np. Ola" autocomplete="off" />
+          </label>
+          <label class="setting-field">
+            <span>Ulubione</span>
+            <select id="favoriteTheme">
+              <option value="">Bez preferencji</option>
+              <option value="bajki">Bajki</option>
+              <option value="kosmos">Kosmos</option>
+              <option value="roboty">Roboty</option>
+              <option value="przyroda">Przyroda</option>
+              <option value="emocje">Emocje</option>
+              <option value="zagadki">Zagadki</option>
+              <option value="sztuka">Sztuka</option>
+              <option value="dinozaury">Dinozaury</option>
+            </select>
+          </label>
+          <label class="setting-field">
+            <span>Długość</span>
+            <select id="answerLength">
+              <option value="short">Krótko</option>
+              <option value="normal" selected>W sam raz</option>
+              <option value="long">Opowieść</option>
+            </select>
+          </label>
+          <label class="setting-field">
+            <span>Bajkowość</span>
+            <input id="wonderLevel" type="range" min="0" max="2" step="1" value="2" />
+          </label>
+          <label class="setting-field">
+            <span>Bezpieczeństwo</span>
+            <select id="safetyLevel">
+              <option value="strict" selected>Wysokie</option>
+              <option value="normal">Normalne</option>
+            </select>
+          </label>
+          <label class="setting-field voice-picker">
+            <span>Głos</span>
+            <select id="voiceSelect">
+              <option value="auto">Najlepszy polski</option>
+            </select>
+          </label>
+          <label class="setting-field voice-server-toggle">
+            <span>Audio</span>
+            <span class="inline-check">
+              <input id="serverTtsToggle" type="checkbox" checked />
+              Lepszy TTS
+            </span>
+          </label>
+          <button id="voicePreview" class="parent-action" type="button">Próbka głosu</button>
+        </div>
+
+        <div class="config-box">
+          <span>Model</span>
+          <strong id="modelName">-</strong>
+        </div>
+
+        <div class="memory-panel">
+          <div class="memory-section">
+            <div class="memory-head">
+              <h3>Historia</h3>
+              <button id="clearHistory" type="button">Wyczyść</button>
+            </div>
+            <div id="historyList" class="memory-list"></div>
+          </div>
+          <div class="memory-section">
+            <div class="memory-head">
+              <h3>Ulubione</h3>
+              <button id="clearFavorites" type="button">Wyczyść</button>
+            </div>
+            <div id="favoriteList" class="memory-list"></div>
+          </div>
+        </div>
+
+        <div id="parentLock" class="parent-lock" aria-live="polite">
+          <div class="parent-lock-box">
+            <span id="pinMode">PIN rodzica</span>
+            <h2 id="pinTitle">Odblokuj panel</h2>
+            <input id="parentPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="PIN" />
+            <div class="pin-actions">
+              <button id="unlockParent" type="button">Odblokuj</button>
+              <button id="resetPin" type="button">Reset PIN</button>
+            </div>
+            <p id="pinStatus">Panel opiekuna jest chroniony lokalnym PIN-em.</p>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <script src="/app.js?v=26" type="module"></script>
+  </body>
+</html>

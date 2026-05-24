@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Iskierka">
+  <rect width="512" height="512" rx="108" fill="#17104a"/>
+  <circle cx="256" cy="246" r="154" fill="#f1cf6d"/>
+  <circle cx="214" cy="207" r="25" fill="#fff8eb"/>
+  <circle cx="214" cy="207" r="11" fill="#201a3f"/>
+  <circle cx="306" cy="222" r="14" fill="#201a3f"/>
+  <path d="M183 296c39 45 102 50 145 13" fill="none" stroke="#201a3f" stroke-width="23" stroke-linecap="round"/>
+  <path d="M337 309c34-14 64-3 87 29-42 7-75-2-87-29Z" fill="#e05f9b"/>
+  <path d="m126 114 24 49 54 8-39 38 9 54-48-25-48 25 9-54-39-38 54-8 24-49Z" fill="#77e0db"/>
+  <path d="m389 95 16 33 36 5-26 25 6 36-32-17-32 17 6-36-26-25 36-5 16-33Z" fill="#9c86f2"/>
+</svg>
