@@ -2000,10 +2000,15 @@ body.parent-unlocked .parent-lock {
   font-weight: 900;
 }
 
-.pin-actions button:last-child {
+#resetPin,
+#closeParentPin {
   color: #fff4dc;
   background: rgba(239, 201, 93, 0.14);
   border: 1px solid rgba(239, 201, 93, 0.34);
+}
+
+#closeParentPin {
+  display: none;
 }
 
 .sr-only {
@@ -2219,9 +2224,30 @@ body.friend-test .chat-panel {
     padding-top: 12px;
   }
 
-  .parent-panel.is-locked {
-    min-height: auto;
-    padding-bottom: 14px;
+  body:not(.parent-pin-open) .parent-panel.is-locked {
+    display: none;
+  }
+
+  body.parent-pin-open {
+    overflow: hidden;
+  }
+
+  body.parent-pin-open .parent-panel.is-locked {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: 1fr;
+    align-content: start;
+    width: 100%;
+    min-height: 100dvh;
+    padding: 18px 14px;
+    overflow: auto;
+    background:
+      radial-gradient(circle at 16% 8%, rgba(239, 201, 93, 0.18), transparent 15rem),
+      radial-gradient(circle at 84% 14%, rgba(88, 116, 232, 0.28), transparent 17rem),
+      linear-gradient(180deg, #0d0a24 0%, #1b1151 100%);
+    border: 0;
   }
 
   .parent-panel.is-locked .panel-art,
@@ -2244,17 +2270,28 @@ body.friend-test .chat-panel {
     height: 120px;
   }
 
-  .parent-lock {
+  body.parent-pin-open .parent-panel.is-locked .parent-lock {
     position: relative;
     inset: auto;
     grid-column: 1;
     align-items: start;
     min-height: auto;
-    padding: 14px 16px 16px;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
   }
 
-  .parent-lock-box {
-    width: 100%;
+  body.parent-pin-open .parent-lock-box {
+    width: min(360px, 100%);
+    margin: 18px auto 0;
+  }
+
+  body.parent-pin-open .pin-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.parent-pin-open #closeParentPin {
+    display: block;
   }
 }
 

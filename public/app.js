@@ -43,6 +43,7 @@ const parentLock = document.querySelector("#parentLock");
 const parentPinInput = document.querySelector("#parentPin");
 const unlockParentButton = document.querySelector("#unlockParent");
 const resetPinButton = document.querySelector("#resetPin");
+const closeParentPinButton = document.querySelector("#closeParentPin");
 const lockParentButton = document.querySelector("#lockParent");
 const pinMode = document.querySelector("#pinMode");
 const pinTitle = document.querySelector("#pinTitle");
@@ -326,7 +327,21 @@ lockParentButton?.addEventListener("click", () => {
 });
 
 parentJumpButton?.addEventListener("click", () => {
+  if (openMobileParentPin()) return;
+
   parentPanel?.scrollIntoView({ behavior: "auto", block: "start" });
+});
+
+closeParentPinButton?.addEventListener("click", () => {
+  closeMobileParentPin();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeMobileParentPin();
+});
+
+globalThis.addEventListener?.("resize", () => {
+  if (!isMobileParentPinMode()) closeMobileParentPin();
 });
 
 shufflePromptsButton.addEventListener("click", () => {
@@ -787,6 +802,13 @@ function updateParentLockState(message = "") {
   document.body.classList.toggle("parent-unlocked", parentUnlocked);
   parentPanel?.classList.toggle("is-locked", !parentUnlocked);
 
+  if (parentUnlocked) {
+    closeMobileParentPin();
+    if (isMobileParentPinMode()) {
+      globalThis.setTimeout(() => parentPanel?.scrollIntoView({ behavior: "auto", block: "start" }), 90);
+    }
+  }
+
   if (pinMode) pinMode.textContent = hasPin ? "PIN rodzica" : "Ustaw PIN rodzica";
   if (pinTitle) pinTitle.textContent = hasPin ? "Odblokuj panel" : "Wymyśl PIN";
   if (unlockParentButton) unlockParentButton.textContent = hasPin ? "Odblokuj" : "Ustaw PIN";
@@ -801,6 +823,22 @@ function updateParentLockState(message = "") {
     parentPinInput.value = "";
     parentPinInput.placeholder = hasPin ? "PIN" : "Nowy PIN";
   }
+}
+
+function isMobileParentPinMode() {
+  return globalThis.matchMedia?.("(max-width: 720px)").matches ?? false;
+}
+
+function openMobileParentPin() {
+  if (!isMobileParentPinMode() || parentUnlocked) return false;
+
+  document.body.classList.add("parent-pin-open");
+  globalThis.setTimeout(() => parentPinInput?.focus(), 80);
+  return true;
+}
+
+function closeMobileParentPin() {
+  document.body.classList.remove("parent-pin-open");
 }
 
 async function handleParentPinSubmit() {
