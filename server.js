@@ -682,7 +682,11 @@ function sendBinary(res, status, buffer, contentType, extraHeaders = {}) {
 
 function serveStatic(urlPathname, res) {
   const cleanPath = decodeURIComponent(urlPathname).split("?")[0];
-  const relativePath = cleanPath === "/" ? "index.html" : cleanPath.replace(/^\/+/, "");
+  const relativePath = cleanPath === "/"
+    ? "index.html"
+    : ["/rodzic", "/rodzic/"].includes(cleanPath)
+      ? "rodzic.html"
+      : cleanPath.replace(/^\/+/, "");
   const filePath = path.normalize(path.join(publicDir, relativePath));
 
   if (filePath !== publicDir && !filePath.startsWith(publicDir + path.sep)) {

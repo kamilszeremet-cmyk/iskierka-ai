@@ -48,12 +48,15 @@ const lockParentButton = document.querySelector("#lockParent");
 const pinMode = document.querySelector("#pinMode");
 const pinTitle = document.querySelector("#pinTitle");
 const pinStatus = document.querySelector("#pinStatus");
+const plusInterestButton = document.querySelector("#plusInterest");
+const plusStatus = document.querySelector("#plusStatus");
 
 const settingsStorageKey = "iskierka-parent-settings";
 const historyStorageKey = "iskierka-history";
 const favoritesStorageKey = "iskierka-favorites";
 const onboardingStorageKey = "iskierka-onboarding-done";
 const parentPinStorageKey = "iskierka-parent-pin";
+const plusInterestStorageKey = "iskierka-plus-interest";
 const parentPinSalt = "iskierka-local-parent-pin-v1";
 const wonderValues = ["low", "medium", "high"];
 const wonderLabels = {
@@ -205,6 +208,7 @@ hydrateHealth();
 setupVoice();
 renderPrompts();
 renderMemory();
+updatePlusStatus();
 refreshStartTitle();
 updateChatStarted();
 updateOnboardingState();
@@ -342,6 +346,11 @@ document.addEventListener("keydown", (event) => {
 
 globalThis.addEventListener?.("resize", () => {
   if (!isMobileParentPinMode()) closeMobileParentPin();
+});
+
+plusInterestButton?.addEventListener("click", () => {
+  localStorage.setItem(plusInterestStorageKey, new Date().toISOString());
+  updatePlusStatus("Zapisane. W kolejnym kroku można podpiąć płatność albo listę oczekujących rodziców.");
 });
 
 shufflePromptsButton.addEventListener("click", () => {
@@ -839,6 +848,19 @@ function openMobileParentPin() {
 
 function closeMobileParentPin() {
   document.body.classList.remove("parent-pin-open");
+}
+
+function updatePlusStatus(message = "") {
+  if (!plusStatus) return;
+
+  const savedAt = localStorage.getItem(plusInterestStorageKey);
+  plusStatus.textContent = message || (savedAt
+    ? "Zainteresowanie Planem Plus jest zapisane lokalnie na tym urządzeniu."
+    : "Płatności są jeszcze wyłączone w tej wersji testowej.");
+
+  if (plusInterestButton && savedAt) {
+    plusInterestButton.textContent = "Plan Plus zapisany";
+  }
 }
 
 async function handleParentPinSubmit() {
