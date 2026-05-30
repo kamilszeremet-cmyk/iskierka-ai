@@ -746,6 +746,8 @@ textarea:focus-visible {
 }
 
 .install-button {
+  display: inline-grid;
+  place-items: center;
   min-height: 42px;
   padding: 0 14px;
   color: #fff8eb;
@@ -754,6 +756,13 @@ textarea:focus-visible {
   border-radius: 8px;
   font-family: var(--font-display);
   font-weight: 900;
+  text-decoration: none;
+}
+
+.parent-landing-button {
+  color: #201a3f;
+  background: linear-gradient(135deg, #efc95d, #d18a4e);
+  border-color: rgba(255, 248, 235, 0.66);
 }
 
 .share-button {
