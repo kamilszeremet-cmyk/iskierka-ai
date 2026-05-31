@@ -58,6 +58,12 @@ const parentCodeInput = document.querySelector("#parentCode");
 const requestParentCodeButton = document.querySelector("#requestParentCode");
 const verifyParentCodeButton = document.querySelector("#verifyParentCode");
 const accountStatus = document.querySelector("#accountStatus");
+const refreshAnalyticsButton = document.querySelector("#refreshAnalytics");
+const analyticsStatus = document.querySelector("#analyticsStatus");
+const metricAppOpen = document.querySelector("#metricAppOpen");
+const metricParentOpen = document.querySelector("#metricParentOpen");
+const metricCheckout = document.querySelector("#metricCheckout");
+const metricBeta = document.querySelector("#metricBeta");
 
 const settingsStorageKey = "iskierka-parent-settings";
 const historyStorageKey = "iskierka-history";
@@ -381,6 +387,10 @@ verifyParentCodeButton?.addEventListener("click", () => {
   verifyParentCode();
 });
 
+refreshAnalyticsButton?.addEventListener("click", () => {
+  fetchAnalyticsSummary();
+});
+
 shufflePromptsButton.addEventListener("click", () => {
   promptOffset = (promptOffset + 6 + Math.floor(Math.random() * 5)) % promptPool.length;
   promptDeck = [];
@@ -529,6 +539,7 @@ function friendlyApiError(error) {
 function setupCommerce() {
   if (parentEmailInput) parentEmailInput.value = localStorage.getItem(parentEmailStorageKey) || "";
   fetchCommerceStatus();
+  fetchAnalyticsSummary();
 }
 
 async function fetchCommerceStatus() {
@@ -543,6 +554,25 @@ async function fetchCommerceStatus() {
     if (accountStatus) accountStatus.textContent = parentToken
       ? "Nie mogę teraz sprawdzić konta rodzica."
       : "Konto rodzica nie jest zalogowane.";
+  }
+}
+
+async function fetchAnalyticsSummary() {
+  if (analyticsStatus) analyticsStatus.textContent = "Odświeżam mini-analitykę...";
+
+  try {
+    const response = await fetch("/api/analytics/summary", {
+      headers: commerceHeaders()
+    });
+    const data = await readApiJson(response);
+    const summary = data.summary || {};
+    if (metricAppOpen) metricAppOpen.textContent = String(summary.appOpen || 0);
+    if (metricParentOpen) metricParentOpen.textContent = String(summary.parentPanelOpen || 0);
+    if (metricCheckout) metricCheckout.textContent = String(summary.checkoutClick || 0);
+    if (metricBeta) metricBeta.textContent = `${data.beta?.count || 0}/${data.beta?.target || 10}`;
+    if (analyticsStatus) analyticsStatus.textContent = "Zliczamy tylko zdarzenia, bez pytań i odpowiedzi dziecka.";
+  } catch {
+    if (analyticsStatus) analyticsStatus.textContent = "Nie mogę teraz pobrać mini-analityki.";
   }
 }
 
@@ -641,12 +671,14 @@ async function startPlusCheckout() {
 
     if (data.url) {
       updatePlusStatus("Przenoszę do bezpiecznej płatności...");
+      fetchAnalyticsSummary();
       window.location.href = data.url;
       return;
     }
 
     updatePlusStatus(data.message || "Zapisano do bety sprzedażowej Planu Plus.");
     await fetchCommerceStatus();
+    await fetchAnalyticsSummary();
     updatePlusStatus(data.message || "Zapisano do bety sprzedażowej Planu Plus.");
   } catch (error) {
     updatePlusStatus(friendlyApiError(error));
@@ -669,7 +701,8 @@ async function joinSalesBeta(source = "manual") {
 
     localStorage.setItem(plusInterestStorageKey, new Date().toISOString());
     trackEvent("beta_signup", { plan: "free" });
-    updatePlusStatus(`${data.message} Miejsce: ${data.betaPosition}.`);
+    await fetchAnalyticsSummary();
+    updatePlusStatus(`${data.message} Miejsce: ${data.betaPosition}/${data.betaTarget || 10}.`);
   } catch (error) {
     updatePlusStatus(friendlyApiError(error));
   } finally {
@@ -1002,7 +1035,7 @@ function setupFriendTestShare() {
   shareTestButton?.addEventListener("click", async () => {
     const url = new URL(window.location.href);
     url.searchParams.set("try", "friend");
-    url.searchParams.set("v", "34");
+    url.searchParams.set("v", "35");
     url.hash = "";
 
     const shareData = {

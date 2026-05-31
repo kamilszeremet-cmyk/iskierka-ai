@@ -111,18 +111,31 @@ Aplikacja ma MVP monetyzacji:
 - limit Free ustawiany przez `FREE_DAILY_LIMIT`, domyslnie 15 odpowiedzi dziennie,
 - testowe konto rodzica przez email i kod pokazywany na ekranie,
 - przycisk `Kup Plan Plus` w panelu rodzica,
+- webhook Stripe `/api/stripe/webhook`, ktory aktywuje Plan Plus po `checkout.session.completed`,
+- prawdziwa wysylka kodu rodzica przez Resend, jesli ustawisz `RESEND_API_KEY`,
 - prywatnosciowa analityka zdarzen bez tresci rozmow,
-- zapis do bety sprzedazowej, gdy Stripe nie jest skonfigurowany.
+- mini-panel analityki w panelu rodzica,
+- zapis do bety sprzedazowej 10 rodzin, gdy Stripe nie jest skonfigurowany.
 
 Do prawdziwego checkoutu ustaw:
 
 ```env
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PRICE_PLUS_MONTHLY=price_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 PUBLIC_BASE_URL=https://twoja-domena.pl
 ```
 
 Bez tych sekretow klikniecie Plusa zapisuje rodzica do bety zamiast otwierac platnosc.
+
+Do prawdziwego emaila z kodem ustaw:
+
+```env
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=Iskierka <noreply@twoja-domena.pl>
+```
+
+Polityka prywatnosci jest pod `/polityka-prywatnosci`.
 
 ## Deploy
 

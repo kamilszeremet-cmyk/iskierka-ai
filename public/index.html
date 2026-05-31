@@ -8,7 +8,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icon.svg" />
-    <link rel="stylesheet" href="/style.css?v=34" />
+    <link rel="stylesheet" href="/style.css?v=35" />
   </head>
   <body>
     <div class="storybook-bg" aria-hidden="true">
@@ -294,10 +294,27 @@
           </div>
           <div class="plus-actions">
             <button id="plusInterest" class="parent-action" type="button">Kup Plan Plus</button>
-            <button id="betaSignup" class="parent-link-button" type="button">Beta 30 rodzin</button>
+            <button id="betaSignup" class="parent-link-button" type="button">Beta 10 rodzin</button>
             <a class="parent-link-button" href="/rodzic">Landing dla rodzica</a>
           </div>
           <p id="plusStatus" class="plus-status">Zaloguj konto rodzica, żeby kupić Plan Plus albo zapisać się do bety.</p>
+        </section>
+
+        <section class="analytics-panel" aria-label="Mini analityka">
+          <div class="analytics-head">
+            <div>
+              <span>Mini analityka</span>
+              <h3>Bez treści rozmów</h3>
+            </div>
+            <button id="refreshAnalytics" class="parent-link-button" type="button">Odśwież</button>
+          </div>
+          <div class="analytics-grid">
+            <div><span>Wejścia</span><strong id="metricAppOpen">0</strong></div>
+            <div><span>Panel rodzica</span><strong id="metricParentOpen">0</strong></div>
+            <div><span>Klik Plus</span><strong id="metricCheckout">0</strong></div>
+            <div><span>Beta</span><strong id="metricBeta">0/10</strong></div>
+          </div>
+          <p id="analyticsStatus" class="plus-status">Zliczamy tylko zdarzenia, bez pytań i odpowiedzi dziecka.</p>
         </section>
 
         <div class="memory-panel">
@@ -333,6 +350,6 @@
       </aside>
     </main>
 
-    <script src="/app.js?v=34" type="module"></script>
+    <script src="/app.js?v=35" type="module"></script>
   </body>
 </html>

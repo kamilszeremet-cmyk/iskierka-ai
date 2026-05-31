@@ -1,6 +1,6 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
 import os from "node:os";
@@ -29,7 +29,12 @@ const FREE_DAILY_LIMIT = Number.isFinite(configuredFreeLimit) ? Math.max(0, conf
 const PLUS_PRICE_LABEL = process.env.PLUS_PRICE_LABEL || "29 zł / mies.";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_PLUS_MONTHLY = process.env.STRIPE_PRICE_PLUS_MONTHLY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Iskierka <onboarding@resend.dev>";
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+const configuredBetaTarget = Number.parseInt(process.env.BETA_TARGET_SIZE || "10", 10);
+const BETA_TARGET_SIZE = Number.isFinite(configuredBetaTarget) ? Math.max(1, configuredBetaTarget) : 10;
 
 const dailyUsage = new Map();
 const parentCodes = new Map();
@@ -37,6 +42,7 @@ const parentAccounts = new Map();
 const parentSessions = new Map();
 const betaSignups = new Map();
 const analyticsCounters = new Map();
+const checkoutSessions = new Map();
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -86,16 +92,22 @@ const server = http.createServer(async (req, res) => {
         configured: Boolean(NVIDIA_API_KEY),
         model: NVIDIA_MODEL,
         tts: getTtsStatus(),
-        commerce: {
-          freeDailyLimit: FREE_DAILY_LIMIT,
-          checkoutConfigured: hasStripeCheckout(),
-          price: PLUS_PRICE_LABEL
-        }
-      });
+    commerce: {
+      freeDailyLimit: FREE_DAILY_LIMIT,
+      checkoutConfigured: hasStripeCheckout(),
+      emailConfigured: hasEmailDelivery(),
+      price: PLUS_PRICE_LABEL,
+      betaTarget: BETA_TARGET_SIZE
     }
+  });
+}
 
     if (req.method === "GET" && url.pathname === "/api/commerce/status") {
       return handleCommerceStatus(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/analytics/summary") {
+      return handleAnalyticsSummary(req, res);
     }
 
     if (req.method === "POST" && url.pathname === "/api/chat") {
@@ -124,6 +136,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/analytics/event") {
       return handleAnalyticsEvent(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/stripe/webhook") {
+      return handleStripeWebhook(req, res);
     }
 
     if (req.method === "GET") {
@@ -165,8 +181,22 @@ async function handleCommerceStatus(req, res) {
     usage: access.status,
     account: accountPayload(access.account),
     checkoutConfigured: hasStripeCheckout(),
+    emailConfigured: hasEmailDelivery(),
     price: PLUS_PRICE_LABEL,
-    betaCount: betaSignups.size
+    betaCount: betaSignups.size,
+    betaTarget: BETA_TARGET_SIZE
+  });
+}
+
+async function handleAnalyticsSummary(req, res) {
+  sendJson(res, 200, {
+    ok: true,
+    summary: buildAnalyticsSummary(),
+    beta: {
+      count: betaSignups.size,
+      target: BETA_TARGET_SIZE,
+      remaining: Math.max(0, BETA_TARGET_SIZE - betaSignups.size)
+    }
   });
 }
 
@@ -185,12 +215,14 @@ async function handleParentCodeRequest(req, res) {
   });
   ensureParentAccount(email);
   trackServerEvent("parent_code_requested", { emailHash: hashValue(email) });
+  const delivery = await sendParentLoginCode(email, code);
 
   sendJson(res, 200, {
     ok: true,
     email: maskEmail(email),
-    devCode: code,
-    message: "Kod testowy jest gotowy. W produkcji podłączymy wysyłkę email."
+    delivery: delivery.mode,
+    devCode: delivery.showCode ? code : undefined,
+    message: delivery.message
   });
 }
 
@@ -244,6 +276,7 @@ async function handleCheckoutSession(req, res) {
       ok: true,
       mode: "beta",
       betaPosition: beta.position,
+      betaTarget: BETA_TARGET_SIZE,
       message: "Stripe nie jest jeszcze skonfigurowany. Zapisaliśmy rodzica do bety sprzedażowej Planu Plus.",
       usage: access.status
     });
@@ -258,6 +291,7 @@ async function handleCheckoutSession(req, res) {
   params.set("client_reference_id", hashValue(access.account.email));
   params.set("success_url", `${baseUrl}/?checkout=success`);
   params.set("cancel_url", `${baseUrl}/rodzic#plan-plus`);
+  params.set("metadata[parent_email]", access.account.email);
   params.set("metadata[parent_email_hash]", hashValue(access.account.email));
   params.set("metadata[product]", "iskierka_plus");
 
@@ -274,6 +308,13 @@ async function handleCheckoutSession(req, res) {
   if (!response.ok || !data.url) {
     const error = data?.error?.message || "Nie udało się utworzyć płatności Stripe.";
     return sendJson(res, 502, { error });
+  }
+
+  if (data.id) {
+    checkoutSessions.set(data.id, {
+      email: access.account.email,
+      createdAt: new Date().toISOString()
+    });
   }
 
   sendJson(res, 200, {
@@ -297,6 +338,7 @@ async function handleBetaSignup(req, res) {
   sendJson(res, 200, {
     ok: true,
     betaPosition: beta.position,
+    betaTarget: BETA_TARGET_SIZE,
     message: "Rodzic zapisany do bety sprzedażowej.",
     account: accountPayload(ensureParentAccount(email))
   });
@@ -314,6 +356,58 @@ async function handleAnalyticsEvent(req, res) {
   }
 
   sendJson(res, 200, { ok: true });
+}
+
+async function handleStripeWebhook(req, res) {
+  const rawBody = await readRawBody(req);
+  const signature = req.headers["stripe-signature"];
+
+  if (!STRIPE_WEBHOOK_SECRET) {
+    return sendJson(res, 400, { error: "Brakuje STRIPE_WEBHOOK_SECRET." });
+  }
+
+  if (!verifyStripeSignature(rawBody, signature, STRIPE_WEBHOOK_SECRET)) {
+    trackServerEvent("stripe_webhook_rejected");
+    return sendJson(res, 400, { error: "Nieprawidłowy podpis Stripe." });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return sendJson(res, 400, { error: "Niepoprawny JSON webhooka Stripe." });
+  }
+
+  const type = String(event.type || "");
+  if (type === "checkout.session.completed") {
+    const session = event.data?.object || {};
+    const email = resolveCheckoutEmail(session);
+
+    if (email) {
+      const account = activatePlusForEmail(email, {
+        stripeCustomerId: session.customer || "",
+        stripeSubscriptionId: session.subscription || "",
+        checkoutSessionId: session.id || ""
+      });
+      trackServerEvent("plus_activated", { plan: "plus" });
+      return sendJson(res, 200, {
+        received: true,
+        activated: true,
+        account: accountPayload(account)
+      });
+    }
+
+    trackServerEvent("stripe_webhook_missing_email");
+    return sendJson(res, 200, { received: true, activated: false, reason: "missing_email" });
+  }
+
+  if (type === "customer.subscription.deleted" || type === "customer.subscription.paused") {
+    const subscription = event.data?.object || {};
+    const email = resolveSubscriptionEmail(subscription);
+    if (email) deactivatePlusForEmail(email);
+  }
+
+  sendJson(res, 200, { received: true });
 }
 
 async function handleChat(req, res) {
@@ -472,6 +566,23 @@ function readJsonBody(req) {
   });
 }
 
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = "";
+
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      raw += chunk;
+      if (raw.length > 200_000) {
+        req.destroy();
+        reject(new Error("Za duży webhook."));
+      }
+    });
+    req.on("end", () => resolve(raw));
+    req.on("error", reject);
+  });
+}
+
 function getAccessContext(req, body = {}) {
   const clientId = getClientId(req, body);
   const account = getAccountFromToken(body.parentToken || req.headers["x-iskierka-parent-token"]);
@@ -564,6 +675,25 @@ function getAccountFromToken(token) {
   return parentAccounts.get(session.email) || null;
 }
 
+function activatePlusForEmail(email, stripe = {}) {
+  const account = ensureParentAccount(email);
+  account.plus = true;
+  account.plusActivatedAt = new Date().toISOString();
+  account.stripeCustomerId = stripe.stripeCustomerId || account.stripeCustomerId || "";
+  account.stripeSubscriptionId = stripe.stripeSubscriptionId || account.stripeSubscriptionId || "";
+  account.checkoutSessionId = stripe.checkoutSessionId || account.checkoutSessionId || "";
+  return account;
+}
+
+function deactivatePlusForEmail(email) {
+  const account = parentAccounts.get(email);
+  if (!account) return null;
+  account.plus = false;
+  account.plusDeactivatedAt = new Date().toISOString();
+  trackServerEvent("plus_deactivated", { plan: "plus" });
+  return account;
+}
+
 function accountPayload(account) {
   if (!account) return null;
   return {
@@ -583,6 +713,10 @@ function hasStripeCheckout() {
   return Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_PLUS_MONTHLY);
 }
 
+function hasEmailDelivery() {
+  return Boolean(RESEND_API_KEY);
+}
+
 function getPublicBaseUrl(req) {
   if (PUBLIC_BASE_URL) return PUBLIC_BASE_URL;
   const proto = req.headers["x-forwarded-proto"] || "http";
@@ -600,6 +734,42 @@ function saveBetaSignup(email, source = "manual") {
   };
   betaSignups.set(email, signup);
   return { ...signup, account };
+}
+
+async function sendParentLoginCode(email, code) {
+  if (!RESEND_API_KEY) {
+    return {
+      mode: "screen",
+      showCode: true,
+      message: "Kod testowy jest gotowy. Dodaj RESEND_API_KEY, żeby wysyłać go prawdziwym mailem."
+    };
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to: [email],
+      subject: "Kod do konta rodzica Iskierka",
+      text: `Twój kod do konta rodzica Iskierka: ${code}. Kod wygasa za 10 minut.`,
+      html: `<p>Twój kod do konta rodzica Iskierka:</p><p style="font-size:24px;font-weight:700">${code}</p><p>Kod wygasa za 10 minut.</p>`
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error?.message || "Nie udało się wysłać maila z kodem.");
+  }
+
+  return {
+    mode: "resend",
+    showCode: false,
+    message: "Kod został wysłany na email rodzica."
+  };
 }
 
 function cleanAnalyticsEvent(value) {
@@ -626,6 +796,92 @@ function trackServerEvent(event, meta = {}) {
   const day = currentDayKey();
   const key = `${day}:${event}:${meta.plan || meta.source || ""}:${meta.path || ""}`;
   analyticsCounters.set(key, (analyticsCounters.get(key) || 0) + 1);
+}
+
+function buildAnalyticsSummary() {
+  const summary = {
+    appOpen: 0,
+    parentPanelOpen: 0,
+    chatSubmit: 0,
+    checkoutClick: 0,
+    betaSignup: 0,
+    parentLogin: 0,
+    plusActivated: 0,
+    freeLimitReached: 0
+  };
+  const eventMap = {
+    app_open: "appOpen",
+    parent_panel_open: "parentPanelOpen",
+    chat_submit: "chatSubmit",
+    checkout_click: "checkoutClick",
+    beta_signup: "betaSignup",
+    parent_login: "parentLogin",
+    plus_activated: "plusActivated",
+    free_limit_reached: "freeLimitReached"
+  };
+
+  for (const [key, value] of analyticsCounters.entries()) {
+    const parts = key.split(":");
+    const event = parts[1];
+    const target = eventMap[event];
+    if (target) summary[target] += value;
+  }
+
+  return summary;
+}
+
+function verifyStripeSignature(rawBody, signatureHeader, secret) {
+  const parsed = parseStripeSignature(signatureHeader);
+  if (!parsed.timestamp || !parsed.signatures.length) return false;
+  const timestamp = Number(parsed.timestamp);
+  if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
+
+  const signedPayload = `${parsed.timestamp}.${rawBody}`;
+  const expected = createHmac("sha256", secret).update(signedPayload, "utf8").digest("hex");
+
+  return parsed.signatures.some((signature) => timingSafeHexEqual(signature, expected));
+}
+
+function parseStripeSignature(header) {
+  const parts = String(header || "").split(",");
+  const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2) || "";
+  const signatures = parts
+    .filter((part) => part.startsWith("v1="))
+    .map((part) => part.slice(3))
+    .filter(Boolean);
+
+  return { timestamp, signatures };
+}
+
+function timingSafeHexEqual(a, b) {
+  const first = Buffer.from(String(a), "hex");
+  const second = Buffer.from(String(b), "hex");
+  if (first.length !== second.length) return false;
+  return timingSafeEqual(first, second);
+}
+
+function resolveCheckoutEmail(session) {
+  const mapped = checkoutSessions.get(session.id || "");
+  const email = cleanEmail(
+    mapped?.email
+      || session.customer_details?.email
+      || session.customer_email
+      || session.metadata?.parent_email
+  );
+  return email;
+}
+
+function resolveSubscriptionEmail(subscription) {
+  const mapped = findAccountByStripeId(subscription.customer, subscription.id);
+  return cleanEmail(mapped?.email || subscription.customer_email || subscription.metadata?.parent_email);
+}
+
+function findAccountByStripeId(customerId, subscriptionId) {
+  for (const account of parentAccounts.values()) {
+    if (customerId && account.stripeCustomerId === customerId) return account;
+    if (subscriptionId && account.stripeSubscriptionId === subscriptionId) return account;
+  }
+  return null;
 }
 
 function hashValue(value) {
@@ -1061,6 +1317,8 @@ function serveStatic(urlPathname, res) {
     ? "index.html"
     : ["/rodzic", "/rodzic/"].includes(cleanPath)
       ? "rodzic.html"
+      : ["/polityka-prywatnosci", "/polityka-prywatnosci/"].includes(cleanPath)
+        ? "polityka-prywatnosci.html"
       : cleanPath.replace(/^\/+/, "");
   const filePath = path.normalize(path.join(publicDir, relativePath));
 
