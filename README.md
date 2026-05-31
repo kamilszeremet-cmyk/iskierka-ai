@@ -104,6 +104,26 @@ Przycisk `Test` kopiuje link z parametrem:
 
 Na localhost link dziala tylko na tym komputerze. Po deployu online mozna wyslac go znajomym, a aplikacja ukryje panel opiekuna i zostawi czystszy widok testowy dla dziecka.
 
+## Plan Plus i beta sprzedazowa
+
+Aplikacja ma MVP monetyzacji:
+
+- limit Free ustawiany przez `FREE_DAILY_LIMIT`, domyslnie 15 odpowiedzi dziennie,
+- testowe konto rodzica przez email i kod pokazywany na ekranie,
+- przycisk `Kup Plan Plus` w panelu rodzica,
+- prywatnosciowa analityka zdarzen bez tresci rozmow,
+- zapis do bety sprzedazowej, gdy Stripe nie jest skonfigurowany.
+
+Do prawdziwego checkoutu ustaw:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PRICE_PLUS_MONTHLY=price_...
+PUBLIC_BASE_URL=https://twoja-domena.pl
+```
+
+Bez tych sekretow klikniecie Plusa zapisuje rodzica do bety zamiast otwierac platnosc.
+
 ## Deploy
 
 Najprosciej:

@@ -479,11 +479,17 @@ textarea:focus-visible {
 
 .value-grid p,
 .pricing-card p,
+.pricing-note,
 .pricing-card li,
 .trust-list p {
   margin: 0;
   color: #ded7fb;
   line-height: 1.48;
+}
+
+.pricing-note {
+  color: #d9ca86;
+  font-size: 0.9rem;
 }
 
 .value-icon {
@@ -805,6 +811,18 @@ textarea:focus-visible {
   background: rgba(13, 10, 36, 0.9);
   border-bottom: 1px solid rgba(156, 134, 242, 0.3);
   font-size: 0.9rem;
+}
+
+.usage-status {
+  min-height: 30px;
+  padding: 6px 10px;
+  color: #fff8eb;
+  background: rgba(239, 201, 93, 0.13);
+  border: 1px solid rgba(239, 201, 93, 0.3);
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .onboarding {
@@ -2228,6 +2246,13 @@ textarea::placeholder {
   box-shadow: 0 10px 20px rgba(6, 4, 20, 0.24);
 }
 
+.parent-action:disabled,
+.parent-link-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+}
+
 .config-box {
   display: grid;
   grid-column: 3;
@@ -2244,6 +2269,57 @@ textarea::placeholder {
 
 .config-box strong {
   overflow-wrap: anywhere;
+}
+
+.parent-account-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+  gap: 12px;
+  padding: 14px;
+  color: #ede6ff;
+  background:
+    radial-gradient(circle at 4% 18%, rgba(88, 116, 232, 0.14), transparent 13rem),
+    rgba(255, 248, 235, 0.06);
+  border: 1px solid rgba(156, 134, 242, 0.28);
+  border-radius: 8px;
+}
+
+.account-copy {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.account-copy span {
+  color: #d9ca86;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.account-copy h3 {
+  margin: 0;
+  color: #fff8eb;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.account-copy p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.account-fields,
+.account-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-actions,
+.parent-account-panel .plus-status {
+  grid-column: 1 / -1;
 }
 
 .plus-panel {
@@ -2435,6 +2511,7 @@ body.parent-unlocked .parent-lock {
 .parent-panel.is-locked .parent-title,
 .parent-panel.is-locked .parent-settings,
 .parent-panel.is-locked .config-box,
+.parent-panel.is-locked .parent-account-panel,
 .parent-panel.is-locked .plus-panel,
 .parent-panel.is-locked .memory-panel {
   filter: blur(2px);
@@ -2566,6 +2643,7 @@ body.friend-test .chat-panel {
   .parent-title,
   .parent-settings,
   .config-box,
+  .parent-account-panel,
   .plus-panel,
   .memory-panel {
     grid-column: 2;
@@ -2679,6 +2757,15 @@ body.friend-test .chat-panel {
   .composer {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .status-strip {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .usage-status {
+    white-space: normal;
   }
 
   .messages {
@@ -2807,6 +2894,7 @@ body.friend-test .chat-panel {
   .parent-panel.is-locked .parent-title,
   .parent-panel.is-locked .parent-settings,
   .parent-panel.is-locked .config-box,
+  .parent-panel.is-locked .parent-account-panel,
   .parent-panel.is-locked .plus-panel,
   .parent-panel.is-locked .memory-panel {
     display: none;
@@ -2816,6 +2904,7 @@ body.friend-test .chat-panel {
   .parent-title,
   .parent-settings,
   .config-box,
+  .parent-account-panel,
   .plus-panel,
   .memory-panel {
     grid-column: 1;
@@ -2825,6 +2914,7 @@ body.friend-test .chat-panel {
     height: 120px;
   }
 
+  .parent-account-panel,
   .plus-panel {
     grid-template-columns: 1fr;
   }
@@ -2882,6 +2972,8 @@ body.friend-test .chat-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .account-fields,
+  .account-actions,
   .plus-plans,
   .plus-actions {
     grid-template-columns: 1fr;

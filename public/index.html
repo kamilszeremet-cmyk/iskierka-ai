@@ -8,7 +8,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icon.svg" />
-    <link rel="stylesheet" href="/style.css?v=33" />
+    <link rel="stylesheet" href="/style.css?v=34" />
   </head>
   <body>
     <div class="storybook-bg" aria-hidden="true">
@@ -79,6 +79,7 @@
 
         <div class="status-strip">
           <span id="providerStatus">Sprawdzam API...</span>
+          <span id="usageStatus" class="usage-status">Free: sprawdzam limit...</span>
           <button id="clearChat" class="ghost-button" type="button">Wyczyść</button>
         </div>
 
@@ -250,17 +251,40 @@
           <strong id="modelName">-</strong>
         </div>
 
+        <section class="parent-account-panel" aria-label="Konto rodzica">
+          <div class="account-copy">
+            <span>Konto rodzica</span>
+            <h3>Email, limit i dostęp Plus</h3>
+            <p>Logowanie jest testowe: wpisz email, pobierz kod i odblokuj zakup Plusa dla tego urządzenia.</p>
+          </div>
+          <div class="account-fields">
+            <label class="setting-field">
+              <span>Email</span>
+              <input id="parentEmail" type="email" maxlength="160" placeholder="rodzic@email.pl" autocomplete="email" />
+            </label>
+            <label class="setting-field">
+              <span>Kod</span>
+              <input id="parentCode" type="text" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code" />
+            </label>
+          </div>
+          <div class="account-actions">
+            <button id="requestParentCode" class="parent-action" type="button">Wyślij kod</button>
+            <button id="verifyParentCode" class="parent-link-button" type="button">Zaloguj</button>
+          </div>
+          <p id="accountStatus" class="plus-status">Konto rodzica nie jest zalogowane.</p>
+        </section>
+
         <section id="planPlus" class="plus-panel" aria-label="Plan Plus">
           <div class="plus-heading">
             <span>Plan Plus</span>
             <h3>Więcej bajek, głosów i spokojnych rozmów</h3>
-            <p>Oferta dla rodzica: większy limit rozmów, lepsze głosy, historia i gotowe zestawy na sen, emocje oraz naukę.</p>
+            <p>Free ma limit dzienny. Plus odblokowuje większy limit, lepsze głosy, historię i gotowe zestawy na sen, emocje oraz naukę.</p>
           </div>
           <div class="plus-plans">
             <article class="plan-card">
               <span>Free</span>
               <strong>0 zł</strong>
-              <p>Dobry do testu z dzieckiem i kilku rozmów dziennie.</p>
+              <p><b id="freeLimitText">15 odpowiedzi dziennie</b>. Dobry do testu z dzieckiem.</p>
             </article>
             <article class="plan-card featured">
               <span>Plus</span>
@@ -269,10 +293,11 @@
             </article>
           </div>
           <div class="plus-actions">
-            <button id="plusInterest" class="parent-action" type="button">Chcę Plan Plus</button>
+            <button id="plusInterest" class="parent-action" type="button">Kup Plan Plus</button>
+            <button id="betaSignup" class="parent-link-button" type="button">Beta 30 rodzin</button>
             <a class="parent-link-button" href="/rodzic">Landing dla rodzica</a>
           </div>
-          <p id="plusStatus" class="plus-status">Płatności są jeszcze wyłączone w tej wersji testowej.</p>
+          <p id="plusStatus" class="plus-status">Zaloguj konto rodzica, żeby kupić Plan Plus albo zapisać się do bety.</p>
         </section>
 
         <div class="memory-panel">
@@ -308,6 +333,6 @@
       </aside>
     </main>
 
-    <script src="/app.js?v=33" type="module"></script>
+    <script src="/app.js?v=34" type="module"></script>
   </body>
 </html>

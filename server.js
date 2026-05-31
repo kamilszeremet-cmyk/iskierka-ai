@@ -1,6 +1,6 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
 import { createReadStream, existsSync } from "node:fs";
 import os from "node:os";
@@ -24,6 +24,19 @@ const TTS_PROVIDER = (process.env.TTS_PROVIDER || (process.platform === "win32" 
 const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY || "";
 const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "";
 const AZURE_SPEECH_VOICE = process.env.AZURE_SPEECH_VOICE || "pl-PL-ZofiaNeural";
+const configuredFreeLimit = Number.parseInt(process.env.FREE_DAILY_LIMIT || "15", 10);
+const FREE_DAILY_LIMIT = Number.isFinite(configuredFreeLimit) ? Math.max(0, configuredFreeLimit) : 15;
+const PLUS_PRICE_LABEL = process.env.PLUS_PRICE_LABEL || "29 zł / mies.";
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_PRICE_PLUS_MONTHLY = process.env.STRIPE_PRICE_PLUS_MONTHLY || "";
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+
+const dailyUsage = new Map();
+const parentCodes = new Map();
+const parentAccounts = new Map();
+const parentSessions = new Map();
+const betaSignups = new Map();
+const analyticsCounters = new Map();
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -72,8 +85,17 @@ const server = http.createServer(async (req, res) => {
         provider: "nvidia",
         configured: Boolean(NVIDIA_API_KEY),
         model: NVIDIA_MODEL,
-        tts: getTtsStatus()
+        tts: getTtsStatus(),
+        commerce: {
+          freeDailyLimit: FREE_DAILY_LIMIT,
+          checkoutConfigured: hasStripeCheckout(),
+          price: PLUS_PRICE_LABEL
+        }
       });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/commerce/status") {
+      return handleCommerceStatus(req, res);
     }
 
     if (req.method === "POST" && url.pathname === "/api/chat") {
@@ -82,6 +104,26 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/tts") {
       return handleTts(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/parent/request-code") {
+      return handleParentCodeRequest(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/parent/verify-code") {
+      return handleParentCodeVerify(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/checkout/session") {
+      return handleCheckoutSession(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/beta/signup") {
+      return handleBetaSignup(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/analytics/event") {
+      return handleAnalyticsEvent(req, res);
     }
 
     if (req.method === "GET") {
@@ -116,15 +158,183 @@ function startServer(port, attemptsLeft = MAX_PORT_TRIES) {
   });
 }
 
+async function handleCommerceStatus(req, res) {
+  const access = getAccessContext(req, {});
+  sendJson(res, 200, {
+    ok: true,
+    usage: access.status,
+    account: accountPayload(access.account),
+    checkoutConfigured: hasStripeCheckout(),
+    price: PLUS_PRICE_LABEL,
+    betaCount: betaSignups.size
+  });
+}
+
+async function handleParentCodeRequest(req, res) {
+  const body = await readJsonBody(req);
+  const email = cleanEmail(body.email);
+
+  if (!email) {
+    return sendJson(res, 400, { error: "Podaj poprawny email rodzica." });
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  parentCodes.set(email, {
+    code,
+    expiresAt: Date.now() + 10 * 60 * 1000
+  });
+  ensureParentAccount(email);
+  trackServerEvent("parent_code_requested", { emailHash: hashValue(email) });
+
+  sendJson(res, 200, {
+    ok: true,
+    email: maskEmail(email),
+    devCode: code,
+    message: "Kod testowy jest gotowy. W produkcji podłączymy wysyłkę email."
+  });
+}
+
+async function handleParentCodeVerify(req, res) {
+  const body = await readJsonBody(req);
+  const email = cleanEmail(body.email);
+  const code = String(body.code || "").replace(/\D/g, "").slice(0, 6);
+  const saved = email ? parentCodes.get(email) : null;
+
+  if (!email || !code) {
+    return sendJson(res, 400, { error: "Podaj email i kod rodzica." });
+  }
+
+  if (!saved || saved.expiresAt < Date.now() || saved.code !== code) {
+    return sendJson(res, 401, { error: "Kod jest nieprawidłowy albo wygasł." });
+  }
+
+  parentCodes.delete(email);
+  const account = ensureParentAccount(email);
+  const token = randomUUID();
+  parentSessions.set(token, {
+    email,
+    expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000
+  });
+  trackServerEvent("parent_login", { emailHash: hashValue(email) });
+
+  sendJson(res, 200, {
+    ok: true,
+    token,
+    account: accountPayload(account),
+    usage: getUsageStatus(getClientId(req, body), account)
+  });
+}
+
+async function handleCheckoutSession(req, res) {
+  const body = await readJsonBody(req);
+  const access = getAccessContext(req, body);
+
+  if (!access.account) {
+    return sendJson(res, 401, {
+      error: "Najpierw zaloguj konto rodzica, żeby kupić Plan Plus.",
+      code: "PARENT_LOGIN_REQUIRED"
+    });
+  }
+
+  trackServerEvent("checkout_click", { plan: "plus", configured: hasStripeCheckout() });
+
+  if (!hasStripeCheckout()) {
+    const beta = saveBetaSignup(access.account.email, "checkout_fallback");
+    return sendJson(res, 200, {
+      ok: true,
+      mode: "beta",
+      betaPosition: beta.position,
+      message: "Stripe nie jest jeszcze skonfigurowany. Zapisaliśmy rodzica do bety sprzedażowej Planu Plus.",
+      usage: access.status
+    });
+  }
+
+  const baseUrl = getPublicBaseUrl(req);
+  const params = new URLSearchParams();
+  params.set("mode", "subscription");
+  params.set("line_items[0][price]", STRIPE_PRICE_PLUS_MONTHLY);
+  params.set("line_items[0][quantity]", "1");
+  params.set("customer_email", access.account.email);
+  params.set("client_reference_id", hashValue(access.account.email));
+  params.set("success_url", `${baseUrl}/?checkout=success`);
+  params.set("cancel_url", `${baseUrl}/rodzic#plan-plus`);
+  params.set("metadata[parent_email_hash]", hashValue(access.account.email));
+  params.set("metadata[product]", "iskierka_plus");
+
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${STRIPE_SECRET_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: params
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || !data.url) {
+    const error = data?.error?.message || "Nie udało się utworzyć płatności Stripe.";
+    return sendJson(res, 502, { error });
+  }
+
+  sendJson(res, 200, {
+    ok: true,
+    mode: "stripe",
+    url: data.url
+  });
+}
+
+async function handleBetaSignup(req, res) {
+  const body = await readJsonBody(req);
+  const access = getAccessContext(req, body);
+  const email = access.account?.email || cleanEmail(body.email);
+
+  if (!email) {
+    return sendJson(res, 400, { error: "Podaj email rodzica albo zaloguj konto rodzica." });
+  }
+
+  const beta = saveBetaSignup(email, body.source || "manual");
+  trackServerEvent("beta_signup", { source: beta.source });
+  sendJson(res, 200, {
+    ok: true,
+    betaPosition: beta.position,
+    message: "Rodzic zapisany do bety sprzedażowej.",
+    account: accountPayload(ensureParentAccount(email))
+  });
+}
+
+async function handleAnalyticsEvent(req, res) {
+  const body = await readJsonBody(req);
+  const event = cleanAnalyticsEvent(body.event);
+
+  if (event) {
+    trackServerEvent(event, {
+      path: cleanAnalyticsPath(body.path),
+      plan: cleanPlan(body.plan)
+    });
+  }
+
+  sendJson(res, 200, { ok: true });
+}
+
 async function handleChat(req, res) {
   const body = await readJsonBody(req);
   const ageMode = cleanAgeMode(body.ageMode);
   const settings = cleanChatSettings(body.settings);
   const profile = cleanChildProfile(body.profile);
   const messages = cleanMessages(body.messages);
+  const access = getAccessContext(req, body);
 
   if (!messages.length) {
     return sendJson(res, 400, { error: "Napisz pytanie, a Iskierka odpowie." });
+  }
+
+  if (!access.allowed) {
+    trackServerEvent("free_limit_reached", { plan: access.status.plan });
+    return sendJson(res, 402, {
+      error: `Limit Free na dziś to ${FREE_DAILY_LIMIT} odpowiedzi. Zaloguj konto rodzica i włącz Plan Plus albo wróć jutro.`,
+      code: "FREE_LIMIT_REACHED",
+      usage: access.status
+    });
   }
 
   const latest = messages[messages.length - 1]?.content || "";
@@ -134,15 +344,18 @@ async function handleChat(req, res) {
     return sendJson(res, 200, {
       reply: guard.reply,
       local: true,
-      model: "local-safety"
+      model: "local-safety",
+      usage: access.status
     });
   }
 
   if (!NVIDIA_API_KEY) {
+    const usage = markChatUsage(access);
     return sendJson(res, 200, {
       reply: demoReply(latest, ageMode, settings),
       local: true,
-      model: "demo"
+      model: "demo",
+      usage
     });
   }
 
@@ -184,10 +397,12 @@ async function handleChat(req, res) {
     return sendJson(res, 502, { error: "Model nie zwrócił tekstu odpowiedzi." });
   }
 
+  const usage = markChatUsage(access);
   sendJson(res, 200, {
     reply: softenReply(reply),
     local: false,
-    model: data.model || NVIDIA_MODEL
+    model: data.model || NVIDIA_MODEL,
+    usage
   });
 }
 
@@ -255,6 +470,166 @@ function readJsonBody(req) {
 
     req.on("error", reject);
   });
+}
+
+function getAccessContext(req, body = {}) {
+  const clientId = getClientId(req, body);
+  const account = getAccountFromToken(body.parentToken || req.headers["x-iskierka-parent-token"]);
+  const status = getUsageStatus(clientId, account);
+
+  return {
+    clientId,
+    account,
+    status,
+    allowed: status.plan === "plus" || status.remaining > 0
+  };
+}
+
+function markChatUsage(access) {
+  if (access.status.plan === "plus") {
+    trackServerEvent("chat_reply", { plan: "plus" });
+    return getUsageStatus(access.clientId, access.account);
+  }
+
+  const key = usageKey(access.clientId, access.account);
+  const current = dailyUsage.get(key) || { day: currentDayKey(), count: 0 };
+  const next = current.day === currentDayKey()
+    ? { ...current, count: current.count + 1 }
+    : { day: currentDayKey(), count: 1 };
+  dailyUsage.set(key, next);
+  trackServerEvent("chat_reply", { plan: "free" });
+  return getUsageStatus(access.clientId, access.account);
+}
+
+function getUsageStatus(clientId, account = null) {
+  const plan = account?.plus ? "plus" : "free";
+  const key = usageKey(clientId, account);
+  const current = dailyUsage.get(key);
+  const used = current?.day === currentDayKey() ? current.count : 0;
+  const remaining = plan === "plus" ? null : Math.max(0, FREE_DAILY_LIMIT - used);
+
+  return {
+    plan,
+    price: PLUS_PRICE_LABEL,
+    dailyLimit: plan === "plus" ? null : FREE_DAILY_LIMIT,
+    used,
+    remaining,
+    checkoutConfigured: hasStripeCheckout()
+  };
+}
+
+function usageKey(clientId, account = null) {
+  return account?.email ? `parent:${hashValue(account.email)}` : `client:${clientId}`;
+}
+
+function getClientId(req, body = {}) {
+  const value = String(body.clientId || req.headers["x-iskierka-client-id"] || "").trim();
+  if (/^[a-zA-Z0-9_-]{12,80}$/.test(value)) return value;
+  return `anon-${hashValue(req.socket?.remoteAddress || "local").slice(0, 24)}`;
+}
+
+function currentDayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function cleanEmail(value) {
+  const email = String(value || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return "";
+  return email.slice(0, 160);
+}
+
+function ensureParentAccount(email) {
+  const existing = parentAccounts.get(email);
+  if (existing) return existing;
+
+  const account = {
+    email,
+    plus: false,
+    createdAt: new Date().toISOString()
+  };
+  parentAccounts.set(email, account);
+  return account;
+}
+
+function getAccountFromToken(token) {
+  const value = String(token || "").trim();
+  if (!value) return null;
+
+  const session = parentSessions.get(value);
+  if (!session || session.expiresAt < Date.now()) {
+    parentSessions.delete(value);
+    return null;
+  }
+
+  return parentAccounts.get(session.email) || null;
+}
+
+function accountPayload(account) {
+  if (!account) return null;
+  return {
+    email: maskEmail(account.email),
+    plan: account.plus ? "plus" : "free",
+    plus: Boolean(account.plus)
+  };
+}
+
+function maskEmail(email) {
+  const [name, domain] = String(email).split("@");
+  if (!name || !domain) return "";
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function hasStripeCheckout() {
+  return Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_PLUS_MONTHLY);
+}
+
+function getPublicBaseUrl(req) {
+  if (PUBLIC_BASE_URL) return PUBLIC_BASE_URL;
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  return `${proto}://${req.headers.host}`;
+}
+
+function saveBetaSignup(email, source = "manual") {
+  const account = ensureParentAccount(email);
+  const existing = betaSignups.get(email);
+  const signup = existing || {
+    email,
+    source: cleanShortText(source, 40),
+    position: betaSignups.size + 1,
+    createdAt: new Date().toISOString()
+  };
+  betaSignups.set(email, signup);
+  return { ...signup, account };
+}
+
+function cleanAnalyticsEvent(value) {
+  const event = cleanShortText(value, 50);
+  return /^[a-z0-9_:-]+$/i.test(event) ? event : "";
+}
+
+function cleanAnalyticsPath(value) {
+  const pathValue = cleanShortText(value || "/", 80);
+  return pathValue.startsWith("/") ? pathValue : "/";
+}
+
+function cleanPlan(value) {
+  return value === "plus" ? "plus" : "free";
+}
+
+function cleanShortText(value, maxLength) {
+  return String(value || "")
+    .replace(/[^\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ@./:#-]/g, "")
+    .slice(0, maxLength);
+}
+
+function trackServerEvent(event, meta = {}) {
+  const day = currentDayKey();
+  const key = `${day}:${event}:${meta.plan || meta.source || ""}:${meta.path || ""}`;
+  analyticsCounters.set(key, (analyticsCounters.get(key) || 0) + 1);
+}
+
+function hashValue(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
 }
 
 function cleanMessages(messages) {

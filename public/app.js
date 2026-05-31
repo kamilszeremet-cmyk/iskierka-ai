@@ -3,6 +3,7 @@ const form = document.querySelector("#chatForm");
 const input = document.querySelector("#userInput");
 const sendButton = document.querySelector("#sendButton");
 const statusEl = document.querySelector("#providerStatus");
+const usageStatus = document.querySelector("#usageStatus");
 const modelEl = document.querySelector("#modelName");
 const clearButton = document.querySelector("#clearChat");
 const installAppButton = document.querySelector("#installApp");
@@ -49,7 +50,14 @@ const pinMode = document.querySelector("#pinMode");
 const pinTitle = document.querySelector("#pinTitle");
 const pinStatus = document.querySelector("#pinStatus");
 const plusInterestButton = document.querySelector("#plusInterest");
+const betaSignupButton = document.querySelector("#betaSignup");
 const plusStatus = document.querySelector("#plusStatus");
+const freeLimitText = document.querySelector("#freeLimitText");
+const parentEmailInput = document.querySelector("#parentEmail");
+const parentCodeInput = document.querySelector("#parentCode");
+const requestParentCodeButton = document.querySelector("#requestParentCode");
+const verifyParentCodeButton = document.querySelector("#verifyParentCode");
+const accountStatus = document.querySelector("#accountStatus");
 
 const settingsStorageKey = "iskierka-parent-settings";
 const historyStorageKey = "iskierka-history";
@@ -57,6 +65,9 @@ const favoritesStorageKey = "iskierka-favorites";
 const onboardingStorageKey = "iskierka-onboarding-done";
 const parentPinStorageKey = "iskierka-parent-pin";
 const plusInterestStorageKey = "iskierka-plus-interest";
+const clientIdStorageKey = "iskierka-client-id";
+const parentTokenStorageKey = "iskierka-parent-token";
+const parentEmailStorageKey = "iskierka-parent-email";
 const parentPinSalt = "iskierka-local-parent-pin-v1";
 const wonderValues = ["low", "medium", "high"];
 const wonderLabels = {
@@ -195,6 +206,9 @@ let currentAudioUrl = "";
 let serverTtsAvailable = true;
 let installPromptEvent = null;
 let parentUnlocked = false;
+let clientId = getOrCreateClientId();
+let parentToken = localStorage.getItem(parentTokenStorageKey) || "";
+let commerceStatus = null;
 let lastAssistantReply = "Cześć. Jestem Iskierka. Mogę tłumaczyć świat prosto, wymyślać opowieści i pomagać w nauce bez straszenia.";
 
 document.body.dataset.age = ageMode;
@@ -205,6 +219,7 @@ setupParentLock();
 setupPwaInstall();
 setupFriendTestShare();
 hydrateHealth();
+setupCommerce();
 setupVoice();
 renderPrompts();
 renderMemory();
@@ -212,6 +227,7 @@ updatePlusStatus();
 refreshStartTitle();
 updateChatStarted();
 updateOnboardingState();
+trackEvent("app_open", { path: location.pathname });
 
 ageButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -331,6 +347,7 @@ lockParentButton?.addEventListener("click", () => {
 });
 
 parentJumpButton?.addEventListener("click", () => {
+  trackEvent("parent_panel_open", { plan: commerceStatus?.usage?.plan || "free" });
   if (openMobileParentPin()) return;
 
   parentPanel?.scrollIntoView({ behavior: "auto", block: "start" });
@@ -349,8 +366,19 @@ globalThis.addEventListener?.("resize", () => {
 });
 
 plusInterestButton?.addEventListener("click", () => {
-  localStorage.setItem(plusInterestStorageKey, new Date().toISOString());
-  updatePlusStatus("Zapisane. W kolejnym kroku można podpiąć płatność albo listę oczekujących rodziców.");
+  startPlusCheckout();
+});
+
+betaSignupButton?.addEventListener("click", () => {
+  joinSalesBeta("plus_panel");
+});
+
+requestParentCodeButton?.addEventListener("click", () => {
+  requestParentCode();
+});
+
+verifyParentCodeButton?.addEventListener("click", () => {
+  verifyParentCode();
 });
 
 shufflePromptsButton.addEventListener("click", () => {
@@ -379,6 +407,7 @@ form.addEventListener("submit", async (event) => {
   appendMessage("user", text);
   conversation.push({ role: "user", content: text });
   updateChatStarted();
+  trackEvent("chat_submit", { plan: commerceStatus?.usage?.plan || "free" });
 
   const pending = appendMessage("assistant", "Układam proste słowa...", { pending: true });
   setBusy(true);
@@ -392,11 +421,14 @@ form.addEventListener("submit", async (event) => {
         ageMode,
         settings: getChatSettings(),
         profile: getChildProfile(),
+        clientId,
+        parentToken,
         messages: conversation
       })
     });
 
     const data = await readApiJson(response);
+    if (data?.usage) updateCommerceStatus(data);
 
     if (!response.ok) {
       throw new Error(data?.error || "Nie udało się porozmawiać z modelem.");
@@ -448,6 +480,9 @@ async function hydrateHealth() {
     const data = await readApiJson(response);
 
     modelEl.textContent = data.model || "-";
+    if (data.commerce?.freeDailyLimit && freeLimitText) {
+      freeLimitText.textContent = `${data.commerce.freeDailyLimit} odpowiedzi dziennie`;
+    }
     serverTtsAvailable = Boolean(data.tts?.available);
     statusEl.textContent = data.configured
       ? "API NVIDIA jest podłączone"
@@ -489,6 +524,200 @@ function friendlyApiError(error) {
   }
 
   return message || "wystąpił problem z połączeniem.";
+}
+
+function setupCommerce() {
+  if (parentEmailInput) parentEmailInput.value = localStorage.getItem(parentEmailStorageKey) || "";
+  fetchCommerceStatus();
+}
+
+async function fetchCommerceStatus() {
+  try {
+    const response = await fetch("/api/commerce/status", {
+      headers: commerceHeaders()
+    });
+    const data = await readApiJson(response);
+    updateCommerceStatus(data);
+  } catch {
+    if (usageStatus) usageStatus.textContent = "Limit Free: offline";
+    if (accountStatus) accountStatus.textContent = parentToken
+      ? "Nie mogę teraz sprawdzić konta rodzica."
+      : "Konto rodzica nie jest zalogowane.";
+  }
+}
+
+function updateCommerceStatus(data = {}) {
+  if (data.usage) commerceStatus = { ...commerceStatus, usage: data.usage };
+  if (data.account !== undefined) commerceStatus = { ...commerceStatus, account: data.account };
+  if (data.checkoutConfigured !== undefined) commerceStatus = { ...commerceStatus, checkoutConfigured: data.checkoutConfigured };
+
+  const usage = commerceStatus?.usage;
+  const account = commerceStatus?.account;
+
+  if (usageStatus && usage) {
+    usageStatus.textContent = usage.plan === "plus"
+      ? "Plan Plus: limit zdjęty"
+      : `Free: ${usage.remaining}/${usage.dailyLimit} dziś`;
+  }
+
+  if (freeLimitText && usage?.dailyLimit) {
+    freeLimitText.textContent = `${usage.dailyLimit} odpowiedzi dziennie`;
+  }
+
+  if (accountStatus) {
+    accountStatus.textContent = account
+      ? `Zalogowano: ${account.email}. Plan: ${account.plan === "plus" ? "Plus" : "Free"}.`
+      : "Konto rodzica nie jest zalogowane.";
+  }
+
+  updatePlusStatus();
+}
+
+async function requestParentCode() {
+  const email = parentEmailInput?.value.trim() || "";
+  setAccountBusy(true);
+  try {
+    const response = await fetch("/api/parent/request-code", {
+      method: "POST",
+      headers: commerceHeaders(),
+      body: JSON.stringify({ email })
+    });
+    const data = await readApiJson(response);
+    if (!response.ok) throw new Error(data?.error || "Nie udało się wysłać kodu.");
+
+    localStorage.setItem(parentEmailStorageKey, email);
+    if (data.devCode && parentCodeInput) parentCodeInput.value = data.devCode;
+    if (accountStatus) {
+      accountStatus.textContent = data.devCode
+        ? `Kod testowy: ${data.devCode}. Wpisz go i kliknij Zaloguj.`
+        : "Kod wysłany. Sprawdź email rodzica.";
+    }
+    trackEvent("parent_code_requested");
+  } catch (error) {
+    if (accountStatus) accountStatus.textContent = friendlyApiError(error);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
+async function verifyParentCode() {
+  const email = parentEmailInput?.value.trim() || localStorage.getItem(parentEmailStorageKey) || "";
+  const code = parentCodeInput?.value.trim() || "";
+  setAccountBusy(true);
+  try {
+    const response = await fetch("/api/parent/verify-code", {
+      method: "POST",
+      headers: commerceHeaders(),
+      body: JSON.stringify({ email, code })
+    });
+    const data = await readApiJson(response);
+    if (!response.ok) throw new Error(data?.error || "Nie udało się zalogować.");
+
+    parentToken = data.token || "";
+    localStorage.setItem(parentTokenStorageKey, parentToken);
+    localStorage.setItem(parentEmailStorageKey, email);
+    updateCommerceStatus(data);
+    trackEvent("parent_login", { plan: data.account?.plan || "free" });
+  } catch (error) {
+    if (accountStatus) accountStatus.textContent = friendlyApiError(error);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
+async function startPlusCheckout() {
+  setPlusBusy(true);
+  try {
+    const response = await fetch("/api/checkout/session", {
+      method: "POST",
+      headers: commerceHeaders(),
+      body: JSON.stringify({ clientId, parentToken })
+    });
+    const data = await readApiJson(response);
+    if (!response.ok) throw new Error(data?.error || "Nie udało się uruchomić płatności.");
+
+    localStorage.setItem(plusInterestStorageKey, new Date().toISOString());
+    trackEvent("checkout_click", { plan: "plus" });
+
+    if (data.url) {
+      updatePlusStatus("Przenoszę do bezpiecznej płatności...");
+      window.location.href = data.url;
+      return;
+    }
+
+    updatePlusStatus(data.message || "Zapisano do bety sprzedażowej Planu Plus.");
+    await fetchCommerceStatus();
+    updatePlusStatus(data.message || "Zapisano do bety sprzedażowej Planu Plus.");
+  } catch (error) {
+    updatePlusStatus(friendlyApiError(error));
+  } finally {
+    setPlusBusy(false);
+  }
+}
+
+async function joinSalesBeta(source = "manual") {
+  setPlusBusy(true);
+  try {
+    const email = parentEmailInput?.value.trim() || localStorage.getItem(parentEmailStorageKey) || "";
+    const response = await fetch("/api/beta/signup", {
+      method: "POST",
+      headers: commerceHeaders(),
+      body: JSON.stringify({ clientId, parentToken, email, source })
+    });
+    const data = await readApiJson(response);
+    if (!response.ok) throw new Error(data?.error || "Nie udało się zapisać do bety.");
+
+    localStorage.setItem(plusInterestStorageKey, new Date().toISOString());
+    trackEvent("beta_signup", { plan: "free" });
+    updatePlusStatus(`${data.message} Miejsce: ${data.betaPosition}.`);
+  } catch (error) {
+    updatePlusStatus(friendlyApiError(error));
+  } finally {
+    setPlusBusy(false);
+  }
+}
+
+function commerceHeaders() {
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Iskierka-Client-Id": clientId
+  };
+  if (parentToken) headers["X-Iskierka-Parent-Token"] = parentToken;
+  return headers;
+}
+
+function setAccountBusy(isBusy) {
+  [requestParentCodeButton, verifyParentCodeButton].forEach((button) => {
+    if (button) button.disabled = isBusy;
+  });
+}
+
+function setPlusBusy(isBusy) {
+  [plusInterestButton, betaSignupButton].forEach((button) => {
+    if (button) button.disabled = isBusy;
+  });
+}
+
+function getOrCreateClientId() {
+  const stored = localStorage.getItem(clientIdStorageKey);
+  if (stored) return stored;
+
+  const value = globalThis.crypto?.randomUUID?.() || `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  localStorage.setItem(clientIdStorageKey, value);
+  return value;
+}
+
+function trackEvent(event, meta = {}) {
+  fetch("/api/analytics/event", {
+    method: "POST",
+    headers: commerceHeaders(),
+    keepalive: true,
+    body: JSON.stringify({
+      event,
+      path: location.pathname,
+      plan: meta.plan || commerceStatus?.usage?.plan || "free"
+    })
+  }).catch(() => {});
 }
 
 function renderPrompts() {
@@ -773,7 +1002,7 @@ function setupFriendTestShare() {
   shareTestButton?.addEventListener("click", async () => {
     const url = new URL(window.location.href);
     url.searchParams.set("try", "friend");
-    url.searchParams.set("v", "24");
+    url.searchParams.set("v", "34");
     url.hash = "";
 
     const shareData = {
@@ -854,12 +1083,25 @@ function updatePlusStatus(message = "") {
   if (!plusStatus) return;
 
   const savedAt = localStorage.getItem(plusInterestStorageKey);
-  plusStatus.textContent = message || (savedAt
-    ? "Zainteresowanie Planem Plus jest zapisane lokalnie na tym urządzeniu."
-    : "Płatności są jeszcze wyłączone w tej wersji testowej.");
+  const account = commerceStatus?.account;
+  const checkoutConfigured = commerceStatus?.checkoutConfigured;
 
-  if (plusInterestButton && savedAt) {
-    plusInterestButton.textContent = "Plan Plus zapisany";
+  plusStatus.textContent = message || (account?.plan === "plus"
+    ? "Plan Plus jest aktywny dla tego konta rodzica."
+    : savedAt
+      ? "Zainteresowanie Planem Plus jest zapisane lokalnie na tym urządzeniu."
+      : account
+        ? checkoutConfigured
+          ? "Możesz kupić Plan Plus przez bezpieczny checkout."
+          : "Stripe nie jest skonfigurowany. Przycisk zapisze rodzica do bety sprzedażowej."
+        : "Zaloguj konto rodzica, żeby kupić Plan Plus albo zapisać się do bety.");
+
+  if (plusInterestButton) {
+    plusInterestButton.textContent = account?.plan === "plus"
+      ? "Plan Plus aktywny"
+      : checkoutConfigured
+        ? "Kup Plan Plus"
+        : "Zapisz do bety Plus";
   }
 }
 
